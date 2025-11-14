@@ -166,7 +166,7 @@ class _DiaryPageState extends State<DiaryPage> {
               const SizedBox(height: 24),
 
               /// 保存ボタン
-              FilledButton(
+              SaveButton(
                 onPressed: () {
                   if (_controller.text.isEmpty || _selectedMood == Mood.none) {
                     return;
@@ -186,7 +186,6 @@ class _DiaryPageState extends State<DiaryPage> {
                   _controller.clear();
                   _selectedMood = Mood.none;
                 },
-                child: const Text("保存する"),
               ),
 
               const SizedBox(height: 24),
@@ -371,6 +370,52 @@ class _HoverCardState extends State<HoverCard> {
                   ],
           ),
           child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+class SaveButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  final bool enabled;
+  final String label;
+
+  const SaveButton({
+    super.key,
+    required this.onPressed,
+    this.enabled = true,
+    this.label = '保存する',
+  });
+
+  @override
+  State<SaveButton> createState() => _SaveButtonState();
+}
+
+class _SaveButtonState extends State<SaveButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() {
+      _pressed = value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: (_) => _setPressed(true),
+      onPointerUp: (_) => _setPressed(false),
+      onPointerCancel: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0, // 押してる間だけ少し小さく
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOutBack, // 戻るときに「ポフッ」とちょいバウンス
+        child: FilledButton(
+          // テーマは今の FilledButtonTheme がそのまま効く
+          onPressed: widget.enabled ? widget.onPressed : null,
+          child: Text(widget.label),
         ),
       ),
     );

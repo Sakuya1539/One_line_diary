@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black, // アイコン・文字色
-          elevation: 0,                  // 影なしでiOSっぽく
+          elevation: 0, // 影なしでiOSっぽく
           surfaceTintColor: Colors.white, // Material3の青っぽい影を消す
         ),
 
@@ -28,7 +28,9 @@ class MyApp extends StatelessWidget {
         // 🔥 FilledButton を「白背景＋薄い枠」で iOSっぽく
         filledButtonTheme: FilledButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.all(const Color.fromARGB(255, 108, 178, 235)),
+            backgroundColor: WidgetStateProperty.all(
+              const Color.fromARGB(255, 108, 178, 235),
+            ),
             foregroundColor: WidgetStateProperty.all(Colors.black),
             surfaceTintColor: WidgetStateProperty.all(Colors.transparent),
             side: WidgetStateProperty.all(
@@ -39,16 +41,13 @@ class MyApp extends StatelessWidget {
               const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
             ),
             shape: WidgetStateProperty.all(
-              RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ),
       ),
       home: const DiaryPage(),
     );
-
   }
 }
 
@@ -61,7 +60,7 @@ class DiaryPage extends StatefulWidget {
 
 class _DiaryPageState extends State<DiaryPage> {
   final TextEditingController _controller = TextEditingController();
-  final FocusNode _textFieldFocusNode = FocusNode();  // ← 追加
+  final FocusNode _textFieldFocusNode = FocusNode(); // ← 追加
   Mood _selectedMood = Mood.none;
   final List<DiaryEntry> _entries = [];
 
@@ -84,17 +83,14 @@ class _DiaryPageState extends State<DiaryPage> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
     final dateText = "${today.year}/${today.month}/${today.day}";
 
     return Scaffold(
-      backgroundColor: Colors.white,   // ← これを追加！
-      appBar: AppBar(
-        title: const Text("Today's Log"),
-      ),
+      backgroundColor: Colors.white, // ← これを追加！
+      appBar: AppBar(title: const Text("Today's Log")),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -116,13 +112,16 @@ class _DiaryPageState extends State<DiaryPage> {
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOut,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: _isTextFieldFocused
-                      ? Colors.blue.withValues(alpha:0.8)
-                      : Colors.grey.shade400,
+                        ? Colors.blue.withValues(alpha: 0.8)
+                        : Colors.grey.shade400,
                     width: _isTextFieldFocused ? 2 : 1,
                   ),
                 ),
@@ -131,7 +130,7 @@ class _DiaryPageState extends State<DiaryPage> {
                   focusNode: _textFieldFocusNode, // ← ここ大事
                   decoration: const InputDecoration(
                     hintText: '今日のひとこと…',
-                    border: InputBorder.none,    // ← 枠線は外側のBoxDecorationで描く
+                    border: InputBorder.none, // ← 枠線は外側のBoxDecorationで描く
                   ),
                   maxLines: 2,
                 ),
@@ -207,28 +206,72 @@ class _DiaryPageState extends State<DiaryPage> {
                     final isNewest = index == 0;
 
                     return TweenAnimationBuilder<double>(
-                      // isNewest なら 0 → 1 にアニメーション、そうでなければ最初から1
-                      tween: Tween<double>(begin: isNewest ? 0.0 : 1.0, end: 1.0),
+                      tween: Tween<double>(
+                        begin: isNewest ? 0.0 : 1.0,
+                        end: 1.0,
+                      ),
                       duration: const Duration(milliseconds: 1000),
                       builder: (context, value, child) {
                         return Opacity(
-                          opacity: value, // 0 → 1 でフェードイン
+                          opacity: value,
                           child: Transform.translate(
-                            offset: Offset(0, (1 - value) * 12), // 下から少し上にスライド
+                            offset: Offset(0, (1 - value) * 12),
                             child: child,
                           ),
                         );
                       },
-                      child: HoverCard(
-                        child:Card(
-                          child: ListTile(
-                            title: Text(entry.text),
-                            subtitle: Text(
-                              "${entry.date.year}/${entry.date.month}/${entry.date.day}",
+
+                      // ✅ ここを差し替え
+                      child: Dismissible(
+                        // それぞれのカードに一意なキーをつける
+                        key: ValueKey(
+                          'entry_${entry.date.toIso8601String()}_${entry.text.hashCode}',
+                        ),
+
+                        // 右→左スワイプだけで削除（iOSっぽい動き）
+                        direction: DismissDirection.endToStart,
+
+                        // スワイプ中に見える「赤い削除背景」
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.delete,
+                            color: Colors.red.withValues(alpha: 0.9),
+                          ),
+                        ),
+
+                        // 実際にスワイプしきったときの処理
+                        onDismissed: (_) {
+                          setState(() {
+                            _entries.remove(entry); // この entry を削除
+                          });
+
+                          // 軽くフィードバック（お好みで）
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('日記を削除しました'),
+                              duration: Duration(seconds: 1),
                             ),
-                            leading: Text(
-                              moodToEmoji(entry.mood),
-                              style: const TextStyle(fontSize: 28),
+                          );
+                        },
+
+                        // 中身はこれまで通り HoverCard + Card
+                        child: HoverCard(
+                          child: Card(
+                            child: ListTile(
+                              title: Text(entry.text),
+                              subtitle: Text(
+                                "${entry.date.year}/${entry.date.month}/${entry.date.day}",
+                              ),
+                              leading: Text(
+                                moodToEmoji(entry.mood),
+                                style: const TextStyle(fontSize: 28),
+                              ),
                             ),
                           ),
                         ),
@@ -254,11 +297,7 @@ class DiaryEntry {
   final String text;
   final Mood mood;
 
-  DiaryEntry({
-    required this.date,
-    required this.text,
-    required this.mood,
-  });
+  DiaryEntry({required this.date, required this.text, required this.mood});
 }
 
 /// ムードボタン
@@ -286,28 +325,23 @@ class MoodButton extends StatelessWidget {
         tween: Tween<double>(begin: 1.0, end: targetScale),
         duration: const Duration(milliseconds: 150),
         builder: (context, scale, child) {
-          return Transform.scale(
-            scale: scale,
-            child: child,
-          );
+          return Transform.scale(scale: scale, child: child);
         },
         // child には「中身のUI」をそのまま渡す
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color:
-                selected ? Colors.blue.withValues(alpha:0.2) : Colors.grey.shade200,
+            color: selected
+                ? Colors.blue.withValues(alpha: 0.2)
+                : Colors.grey.shade200,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: selected ? Colors.blue : Colors.transparent,
               width: 2,
             ),
           ),
-          child: Text(
-            moodToEmoji(mood),
-            style: const TextStyle(fontSize: 28),
-          ),
+          child: Text(moodToEmoji(mood), style: const TextStyle(fontSize: 28)),
         ),
       ),
     );
@@ -345,7 +379,7 @@ class _HoverCardState extends State<HoverCard> {
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: AnimatedScale(
-        scale: _isHovered ? 1.02 : 1.0,           // ← 拡大率だけ指定
+        scale: _isHovered ? 1.02 : 1.0, // ← 拡大率だけ指定
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
         child: AnimatedContainer(

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'dart:convert'; // JSONエンコード/デコード用
+import 'package:shared_preferences/shared_preferences.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -58,22 +61,52 @@ class DiaryPage extends StatefulWidget {
   State<DiaryPage> createState() => _DiaryPageState();
 }
 
+const String _kDiaryEntriesKey = 'diary_entries_v1';
+
 class _DiaryPageState extends State<DiaryPage> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _textFieldFocusNode = FocusNode(); // ← 追加
   Mood _selectedMood = Mood.none;
-  final List<DiaryEntry> _entries = [];
+  List<DiaryEntry> _entries = [];
 
   bool _isTextFieldFocused = false; // ← 追加
 
   @override
   void initState() {
     super.initState();
+    _loadEntries();
     _textFieldFocusNode.addListener(() {
       setState(() {
         _isTextFieldFocused = _textFieldFocusNode.hasFocus;
       });
     });
+  }
+
+  Future<void> _loadEntries() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String>? jsonList = prefs.getStringList(_kDiaryEntriesKey);
+
+    if (jsonList == null) {
+      return; // まだ何も保存されていない
+    }
+
+    setState(() {
+      _entries = jsonList.map((jsonStr) {
+        final Map<String, dynamic> map =
+            jsonDecode(jsonStr) as Map<String, dynamic>;
+        return DiaryEntry.fromJson(map);
+      }).toList();
+    });
+  }
+
+  Future<void> _saveEntries() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> jsonList = _entries.map((entry) {
+      final map = entry.toJson();
+      return jsonEncode(map);
+    }).toList();
+
+    await prefs.setStringList(_kDiaryEntriesKey, jsonList);
   }
 
   @override
@@ -166,7 +199,7 @@ class _DiaryPageState extends State<DiaryPage> {
 
               /// 保存ボタン
               SaveButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_controller.text.isEmpty || _selectedMood == Mood.none) {
                     return;
                   }
@@ -181,6 +214,9 @@ class _DiaryPageState extends State<DiaryPage> {
                       ),
                     );
                   });
+
+                  // 永続化
+                  await _saveEntries();
 
                   _controller.clear();
                   _selectedMood = Mood.none;
@@ -246,12 +282,15 @@ class _DiaryPageState extends State<DiaryPage> {
                         ),
 
                         // 実際にスワイプしきったときの処理
-                        onDismissed: (_) {
+                        onDismissed: (_) async {
                           setState(() {
-                            _entries.remove(entry); // この entry を削除
+                            _entries.remove(entry);
                           });
 
-                          // 軽くフィードバック（お好みで）
+                          await _saveEntries();
+
+                          if (!mounted) return; // ← ここでガード
+
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('日記を削除しました'),
@@ -298,6 +337,27 @@ class DiaryEntry {
   final Mood mood;
 
   DiaryEntry({required this.date, required this.text, required this.mood});
+
+  /// Map に変換（→ JSON 文字列にしやすくする）
+  Map<String, dynamic> toJson() {
+    return {
+      'date': date.toIso8601String(),
+      'text': text,
+      'mood': mood.name, // enum の名前（happy, sad など）
+    };
+  }
+
+  /// Map から DiaryEntry を復元
+  factory DiaryEntry.fromJson(Map<String, dynamic> json) {
+    return DiaryEntry(
+      date: DateTime.parse(json['date'] as String),
+      text: json['text'] as String,
+      mood: Mood.values.firstWhere(
+        (m) => m.name == json['mood'],
+        orElse: () => Mood.none, // 念のため
+      ),
+    );
+  }
 }
 
 /// ムードボタン
